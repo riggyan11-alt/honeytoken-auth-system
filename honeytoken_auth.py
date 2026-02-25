@@ -516,6 +516,7 @@ class EnhancedHoneytokenAuthTool:
         self.session_start_time = datetime.now()
         self._show_otp_screen()
     
+    # ── SCREEN: OTP VERIFICATION ─────────────────────────────────────────────────
     def _show_otp_screen(self):
         """Display OTP verification screen"""
         self._clear_frame()
