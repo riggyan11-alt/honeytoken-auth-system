@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 """
+# Author     : Riggyan Parajuli
+# Student ID : 250325
 Enhanced Dynamic Honeytoken Authentication Tool with Advanced Security Features
 A comprehensive GUI-based security tool with intrusion detection, analytics, and reporting
 """
