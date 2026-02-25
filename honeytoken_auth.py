@@ -626,6 +626,7 @@ class EnhancedHoneytokenAuthTool:
             messagebox.showerror("Error", "Invalid OTP code. Please try again.")
             self.otp_entry.delete(0, tk.END)
     
+    # ── SCREEN: DASHBOARD ────────────────────────────────────────────────────────
     def _show_dashboard(self):
         """Display enhanced user dashboard"""
         self._clear_frame()
