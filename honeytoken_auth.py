@@ -284,6 +284,7 @@ class EnhancedHoneytokenAuthTool:
         for widget in self.main_frame.winfo_children():
             widget.destroy()
     
+    # ── SCREEN: LOGIN ────────────────────────────────────────────────────────────
     def _show_login_screen(self):
         """Display enhanced login screen"""
         self._clear_frame()
