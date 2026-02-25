@@ -215,6 +215,7 @@ class EnhancedHoneytokenAuthTool:
         return score, strength[score], feedback
     
     def _generate_otp(self, secret, counter=None):
+# TOTP: divides Unix time into 30-second windows, applies HMAC-SHA1, truncates to 6 digits
         """Generate TOTP (Time-based OTP)"""
         if counter is None:
             counter = int(time.time() / 30)
