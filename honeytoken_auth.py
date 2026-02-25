@@ -72,6 +72,7 @@ class EnhancedHoneytokenAuthTool:
                 f.write(key)
             return key
     
+    # ── ENCRYPTION & DECRYPTION (Fernet AES-128-CBC + HMAC-SHA256) ──────────────
     def _encrypt_data(self, data):
         """Encrypt data using Fernet"""
         json_data = json.dumps(data)
