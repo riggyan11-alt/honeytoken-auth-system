@@ -1,0 +1,20 @@
+# ──────────────────────────────────────────────
+# Enhanced Honeytoken Authentication System
+# Python Dependencies
+# ──────────────────────────────────────────────
+
+# Fernet symmetric encryption for all stored data files
+cryptography>=41.0.0
+
+# ──────────────────────────────────────────────
+# Built-in modules used (no install needed):
+#   tkinter   — GUI
+#   hashlib   — PBKDF2 password hashing
+#   hmac      — TOTP generation
+#   secrets   — Secure random numbers
+#   re        — Password strength regex
+#   socket    — IP address retrieval
+#   json      — Data serialization
+#   csv       — Report export
+#   os, time, datetime — Files, timestamps, sessions
+# ──────────────────────────────────────────────
