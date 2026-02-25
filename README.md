@@ -86,8 +86,8 @@ Step 2 — Run the application:
 
 | Field | Detail |
 |-------|--------|
-| Student Name | Your Name Here |
-| Student ID | Your ID Here |
+| Student Name | Riggyan Parajuli |
+| Student ID | 250325 |
 | Module | Introduction to Programming ST4017CMD |
 | Programme | BSc Hons Ethical Hacking and Cybersecurity |
 | College | Softwarica College of IT and E-Commerce |
