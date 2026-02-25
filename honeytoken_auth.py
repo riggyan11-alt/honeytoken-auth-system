@@ -994,6 +994,7 @@ class EnhancedHoneytokenAuthTool:
         ttk.Button(settings_frame, text="💾 Save Settings", command=save_settings, 
                   width=20).grid(row=2, column=0, columnspan=2, pady=30)
     
+    # ── SCREEN: HONEYTOKEN MANAGER ───────────────────────────────────────────────
     def _show_honeytoken_manager(self):
         """Display honeytoken management screen"""
         self._clear_frame()
