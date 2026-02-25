@@ -2,7 +2,11 @@
 
 ---
 
-## Version 1.3 — 2026-02-25
+## Version 1.4 — 2026-02-25
+### Final Submission
+- All screenshots added to screenshots folder
+- Project report PDF added to docs folder
+- README updated with correct student details
 
 ### Bug Fixes
 - Fixed Unicode encoding error on Windows when writing emoji characters to intrusion log
