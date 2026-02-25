@@ -235,6 +235,7 @@ class EnhancedHoneytokenAuthTool:
         return otp
     
     def _hash_password(self, password):
+# PBKDF2-HMAC-SHA256 with 100,000 iterations and random 16-byte salt
         """Hash password with salt"""
         salt = secrets.token_hex(16)
         pwdhash = hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 100000)
