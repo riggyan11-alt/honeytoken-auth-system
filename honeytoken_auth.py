@@ -349,7 +349,8 @@ class EnhancedHoneytokenAuthTool:
         ip_info = ttk.Label(self.main_frame, text=f"System IP: {self._get_local_ip()}", 
                            foreground="#6c7086", font=("Arial", 9))
         ip_info.pack(side=tk.BOTTOM, pady=5)
-    
+
+    # ── SCREEN: REGISTRATION ─────────────────────────────────────────────────────
     def _show_register_screen(self):
         """Display enhanced registration screen"""
         self._clear_frame()
