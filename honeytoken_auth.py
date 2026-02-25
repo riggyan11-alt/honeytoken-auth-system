@@ -151,6 +151,7 @@ class EnhancedHoneytokenAuthTool:
             return "127.0.0.1"
     
     def _log_intrusion(self, username, ip=None):
+    # Triggers immediately when any honeytoken username is used, regardless of password
         """Log intrusion attempt with enhanced details"""
         if ip is None:
             ip = self._get_local_ip()
