@@ -1,0 +1,8 @@
+master.key
+*.enc
+intrusion_log.txt
+__pycache__/
+venv/
+.DS_Store
+Thumbs.db
+*.pyc
