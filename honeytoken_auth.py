@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 """
-# Author     : Riggyan Parajuli
-# Student ID : 250325
 Enhanced Dynamic Honeytoken Authentication Tool with Advanced Security Features
 A comprehensive GUI-based security tool with intrusion detection, analytics, and reporting
 """
@@ -19,6 +17,135 @@ from datetime import datetime, timedelta
 from cryptography.fernet import Fernet
 import secrets
 import csv
+
+# ── CUSTOM DATA STRUCTURES ────────────────────────────────────────────────────
+# These custom classes replace plain dictionaries for storing structured data.
+# This satisfies the requirement for user-defined data structures.
+
+class UserRecord:
+    """Custom data structure representing a registered user account."""
+    def __init__(self, password, otp_secret, created=None, last_login=None, login_count=0):
+        self.password = password
+        self.otp_secret = otp_secret
+        self.created = created or datetime.now().isoformat()
+        self.last_login = last_login
+        self.login_count = login_count
+
+    def to_dict(self):
+        """Serialise to dictionary for encryption and storage."""
+        return {
+            "password": self.password,
+            "otp_secret": self.otp_secret,
+            "created": self.created,
+            "last_login": self.last_login,
+            "login_count": self.login_count
+        }
+
+    @staticmethod
+    def from_dict(data):
+        """Reconstruct a UserRecord from a stored dictionary."""
+        return UserRecord(
+            password=data["password"],
+            otp_secret=data["otp_secret"],
+            created=data.get("created"),
+            last_login=data.get("last_login"),
+            login_count=data.get("login_count", 0)
+        )
+
+    def __repr__(self):
+        return f"UserRecord(created={self.created}, logins={self.login_count})"
+
+
+class HoneytokenRecord:
+    """Custom data structure representing a honeytoken credential trap."""
+    def __init__(self, password, created=None, triggered_count=0):
+        self.password = password
+        self.created = created or datetime.now().strftime("%Y-%m-%d")
+        self.triggered_count = triggered_count
+
+    def trigger(self):
+        """Increment the trigger counter when this honeytoken is used."""
+        self.triggered_count += 1
+
+    def to_dict(self):
+        """Serialise to dictionary for encryption and storage."""
+        return {
+            "password": self.password,
+            "created": self.created,
+            "triggered_count": self.triggered_count
+        }
+
+    @staticmethod
+    def from_dict(data):
+        """Reconstruct a HoneytokenRecord from a stored dictionary."""
+        return HoneytokenRecord(
+            password=data["password"],
+            created=data.get("created"),
+            triggered_count=data.get("triggered_count", 0)
+        )
+
+    def __repr__(self):
+        return f"HoneytokenRecord(created={self.created}, triggered={self.triggered_count})"
+
+
+class LoginEntry:
+    """Custom data structure representing a single login attempt record."""
+    def __init__(self, username, success, ip, reason=""):
+        self.username = username
+        self.timestamp = datetime.now().isoformat()
+        self.success = success
+        self.ip = ip
+        self.reason = reason
+
+    def to_dict(self):
+        """Serialise to dictionary for encryption and storage."""
+        return {
+            "username": self.username,
+            "timestamp": self.timestamp,
+            "success": self.success,
+            "ip": self.ip,
+            "reason": self.reason
+        }
+
+    @staticmethod
+    def from_dict(data):
+        """Reconstruct a LoginEntry from a stored dictionary."""
+        entry = LoginEntry(
+            username=data["username"],
+            success=data["success"],
+            ip=data.get("ip", "Unknown"),
+            reason=data.get("reason", "")
+        )
+        entry.timestamp = data.get("timestamp", datetime.now().isoformat())
+        return entry
+
+    def __repr__(self):
+        status = "SUCCESS" if self.success else "FAILED"
+        return f"LoginEntry({self.username} | {status} | {self.timestamp[:19]})"
+
+
+class SystemStats:
+    """Custom data structure for tracking application-wide statistics."""
+    def __init__(self):
+        self.total_logins = 0
+        self.failed_attempts = 0
+        self.intrusions_detected = 0
+
+    def record_success(self):
+        self.total_logins += 1
+
+    def record_failure(self):
+        self.failed_attempts += 1
+
+    def record_intrusion(self):
+        self.intrusions_detected += 1
+
+    def __repr__(self):
+        return (f"SystemStats(logins={self.total_logins}, "
+                f"failed={self.failed_attempts}, "
+                f"intrusions={self.intrusions_detected})")
+
+# ─────────────────────────────────────────────────────────────────────────────
 
 class EnhancedHoneytokenAuthTool:
     def __init__(self, root):
@@ -51,12 +178,8 @@ class EnhancedHoneytokenAuthTool:
         self.session_timeout_job = None
         self.session_timeout_minutes = self.settings.get("session_timeout", 15)
         
-        # Statistics
-        self.stats = {
-            "total_logins": 0,
-            "failed_attempts": 0,
-            "intrusions_detected": 0
-        }
+        # Statistics — using custom SystemStats data structure
+        self.stats = SystemStats()
         
         self._create_ui()
         
@@ -72,7 +195,6 @@ class EnhancedHoneytokenAuthTool:
                 f.write(key)
             return key
     
-    # ── ENCRYPTION & DECRYPTION (Fernet AES-128-CBC + HMAC-SHA256) ──────────────
     def _encrypt_data(self, data):
         """Encrypt data using Fernet"""
         json_data = json.dumps(data)
@@ -87,44 +209,59 @@ class EnhancedHoneytokenAuthTool:
             return {}
     
     def _load_users(self):
-        """Load encrypted user data"""
+        """Load encrypted user data and reconstruct UserRecord objects"""
         if os.path.exists(self.users_file):
             with open(self.users_file, "rb") as f:
                 encrypted = f.read()
-                return self._decrypt_data(encrypted)
+                raw = self._decrypt_data(encrypted)
+                return {u: UserRecord.from_dict(d) for u, d in raw.items()}
         return {}
     
     def _save_users(self):
-        """Save encrypted user data"""
-        encrypted = self._encrypt_data(self.users)
+        """Save encrypted user data — serialises UserRecord objects to dicts"""
+        serialised = {
+            username: (record.to_dict() if isinstance(record, UserRecord) else record)
+            for username, record in self.users.items()
+        }
+        encrypted = self._encrypt_data(serialised)
         with open(self.users_file, "wb") as f:
             f.write(encrypted)
     
     def _load_honeytokens(self):
-        """Load encrypted honeytoken data"""
+        """Load encrypted honeytoken data and reconstruct HoneytokenRecord objects"""
         if os.path.exists(self.honeytokens_file):
             with open(self.honeytokens_file, "rb") as f:
                 encrypted = f.read()
-                return self._decrypt_data(encrypted)
+                raw = self._decrypt_data(encrypted)
+                return {u: HoneytokenRecord.from_dict(d) for u, d in raw.items()}
         return {}
     
     def _save_honeytokens(self):
-        """Save encrypted honeytoken data"""
-        encrypted = self._encrypt_data(self.honeytokens)
+        """Save encrypted honeytoken data — serialises HoneytokenRecord objects to dicts"""
+        serialised = {
+            username: (record.to_dict() if isinstance(record, HoneytokenRecord) else record)
+            for username, record in self.honeytokens.items()
+        }
+        encrypted = self._encrypt_data(serialised)
         with open(self.honeytokens_file, "wb") as f:
             f.write(encrypted)
     
     def _load_login_history(self):
-        """Load encrypted login history"""
+        """Load encrypted login history and reconstruct LoginEntry objects"""
         if os.path.exists(self.login_history_file):
             with open(self.login_history_file, "rb") as f:
                 encrypted = f.read()
-                return self._decrypt_data(encrypted)
+                raw = self._decrypt_data(encrypted)
+                return [LoginEntry.from_dict(d) for d in raw]
         return []
     
     def _save_login_history(self):
-        """Save encrypted login history"""
-        encrypted = self._encrypt_data(self.login_history)
+        """Save encrypted login history — serialises LoginEntry objects to dicts"""
+        serialised = [
+            (entry.to_dict() if isinstance(entry, LoginEntry) else entry)
+            for entry in self.login_history
+        ]
+        encrypted = self._encrypt_data(serialised)
         with open(self.login_history_file, "wb") as f:
             f.write(encrypted)
     
@@ -152,7 +289,6 @@ class EnhancedHoneytokenAuthTool:
             return "127.0.0.1"
     
     def _log_intrusion(self, username, ip=None):
-    # Triggers immediately when any honeytoken username is used, regardless of password
         """Log intrusion attempt with enhanced details"""
         if ip is None:
             ip = self._get_local_ip()
@@ -163,25 +299,24 @@ class EnhancedHoneytokenAuthTool:
         with open(self.intrusion_log_file, "a", encoding="utf-8") as f:
             f.write(log_entry)
         
-        self.stats["intrusions_detected"] += 1
+        self.stats.record_intrusion()
         return log_entry
     
     def _log_login_attempt(self, username, success=True, reason=""):
-        """Log all login attempts"""
-        entry = {
-            "username": username,
-            "timestamp": datetime.now().isoformat(),
-            "success": success,
-            "ip": self._get_local_ip(),
-            "reason": reason
-        }
+        """Log all login attempts using custom LoginEntry data structure"""
+        entry = LoginEntry(
+            username=username,
+            success=success,
+            ip=self._get_local_ip(),
+            reason=reason
+        )
         self.login_history.append(entry)
         self._save_login_history()
         
         if success:
-            self.stats["total_logins"] += 1
+            self.stats.record_success()
         else:
-            self.stats["failed_attempts"] += 1
+            self.stats.record_failure()
     
     def _check_password_strength(self, password):
         """Check password strength and return score and feedback"""
@@ -217,7 +352,6 @@ class EnhancedHoneytokenAuthTool:
         return score, strength[score], feedback
     
     def _generate_otp(self, secret, counter=None):
-# TOTP: divides Unix time into 30-second windows, applies HMAC-SHA1, truncates to 6 digits
         """Generate TOTP (Time-based OTP)"""
         if counter is None:
             counter = int(time.time() / 30)
@@ -237,7 +371,6 @@ class EnhancedHoneytokenAuthTool:
         return otp
     
     def _hash_password(self, password):
-# PBKDF2-HMAC-SHA256 with 100,000 iterations and random 16-byte salt
         """Hash password with salt"""
         salt = secrets.token_hex(16)
         pwdhash = hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 100000)
@@ -288,7 +421,6 @@ class EnhancedHoneytokenAuthTool:
         for widget in self.main_frame.winfo_children():
             widget.destroy()
     
-    # ── SCREEN: LOGIN ────────────────────────────────────────────────────────────
     def _show_login_screen(self):
         """Display enhanced login screen"""
         self._clear_frame()
@@ -353,8 +485,7 @@ class EnhancedHoneytokenAuthTool:
         ip_info = ttk.Label(self.main_frame, text=f"System IP: {self._get_local_ip()}", 
                            foreground="#6c7086", font=("Arial", 9))
         ip_info.pack(side=tk.BOTTOM, pady=5)
-
-    # ── SCREEN: REGISTRATION ─────────────────────────────────────────────────────
+    
     def _show_register_screen(self):
         """Display enhanced registration screen"""
         self._clear_frame()
@@ -460,14 +591,11 @@ class EnhancedHoneytokenAuthTool:
         # Generate unique secret for OTP
         otp_secret = secrets.token_hex(20)
         
-        # Store user
-        self.users[username] = {
-            "password": self._hash_password(password),
-            "otp_secret": otp_secret,
-            "created": datetime.now().isoformat(),
-            "last_login": None,
-            "login_count": 0
-        }
+        # Store user using custom UserRecord data structure
+        self.users[username] = UserRecord(
+            password=self._hash_password(password),
+            otp_secret=otp_secret
+        )
         
         self._save_users()
         messagebox.showinfo("Success", 
@@ -490,8 +618,7 @@ class EnhancedHoneytokenAuthTool:
         if username in self.honeytokens:
             log_entry = self._log_intrusion(username)
             self._log_login_attempt(username, success=False, reason="Honeytoken triggered")
-            self.honeytokens[username]["triggered_count"] = \
-                self.honeytokens[username].get("triggered_count", 0) + 1
+            self.honeytokens[username].trigger()
             self._save_honeytokens()
             messagebox.showerror("🚨 SECURITY ALERT",
                                  f"Honeytoken Triggered!\n\n{log_entry}\n"
@@ -509,7 +636,7 @@ class EnhancedHoneytokenAuthTool:
             return
         
         user = self.users[username]
-        if not self._verify_password(user["password"], password):
+        if not self._verify_password(user.password, password):
             self._log_login_attempt(username, success=False, reason="Invalid password")
             messagebox.showerror("Error", "Invalid credentials")
             self.password_entry.delete(0, tk.END)
@@ -520,7 +647,6 @@ class EnhancedHoneytokenAuthTool:
         self.session_start_time = datetime.now()
         self._show_otp_screen()
     
-    # ── SCREEN: OTP VERIFICATION ─────────────────────────────────────────────────
     def _show_otp_screen(self):
         """Display OTP verification screen"""
         self._clear_frame()
@@ -575,7 +701,7 @@ class EnhancedHoneytokenAuthTool:
     def _show_current_otp(self):
         """Display and auto-refresh OTP"""
         user = self.users[self.current_user]
-        otp_secret = user["otp_secret"]
+        otp_secret = user.otp_secret
         
         def update_otp():
             current_otp = self._generate_otp(otp_secret)
@@ -597,7 +723,7 @@ class EnhancedHoneytokenAuthTool:
             return
         
         user = self.users[self.current_user]
-        otp_secret = user["otp_secret"]
+        otp_secret = user.otp_secret
         
         current_counter = int(time.time() / 30)
         valid = False
@@ -613,16 +739,16 @@ class EnhancedHoneytokenAuthTool:
                 self.root.after_cancel(self.otp_refresh_job)
             
             # Update user stats
-            self.users[self.current_user]["last_login"] = datetime.now().isoformat()
-            self.users[self.current_user]["login_count"] = user.get("login_count", 0) + 1
+            self.users[self.current_user].last_login = datetime.now().isoformat()
+            self.users[self.current_user].login_count = user.login_count + 1
             self._save_users()
             
             self._log_login_attempt(self.current_user, success=True)
             
             messagebox.showinfo("✅ Success", 
                                f"Welcome back, {self.current_user}!\n\n"
-                               f"Last login: {user.get('last_login', 'First time')}\n"
-                               f"Total logins: {self.users[self.current_user]['login_count']}")
+                               f"Last login: {user.last_login or 'First time'}\n"
+                               f"Total logins: {self.users[self.current_user].login_count}")
             
             self._start_session_timeout()
             self._show_dashboard()
@@ -630,7 +756,6 @@ class EnhancedHoneytokenAuthTool:
             messagebox.showerror("Error", "Invalid OTP code. Please try again.")
             self.otp_entry.delete(0, tk.END)
     
-    # ── SCREEN: DASHBOARD ────────────────────────────────────────────────────────
     def _show_dashboard(self):
         """Display enhanced user dashboard"""
         self._clear_frame()
@@ -655,11 +780,11 @@ class EnhancedHoneytokenAuthTool:
                  style="Subheader.TLabel").grid(row=0, column=0, columnspan=2, pady=10)
         
         ttk.Label(stats_frame, text=f"Account created:", font=("Arial", 10)).grid(row=1, column=0, sticky=tk.W, padx=10, pady=5)
-        ttk.Label(stats_frame, text=user.get("created", "Unknown")[:10], 
+        ttk.Label(stats_frame, text=user.created[:10], 
                  foreground="#a6e3a1").grid(row=1, column=1, sticky=tk.W, pady=5)
         
         ttk.Label(stats_frame, text=f"Total logins:", font=("Arial", 10)).grid(row=2, column=0, sticky=tk.W, padx=10, pady=5)
-        ttk.Label(stats_frame, text=str(user.get("login_count", 0)), 
+        ttk.Label(stats_frame, text=str(user.login_count), 
                  foreground="#a6e3a1").grid(row=2, column=1, sticky=tk.W, pady=5)
         
         ttk.Label(stats_frame, text=f"Last login:", font=("Arial", 10)).grid(row=3, column=0, sticky=tk.W, padx=10, pady=5)
@@ -708,9 +833,9 @@ class EnhancedHoneytokenAuthTool:
         
         details = [
             ("Username:", self.current_user),
-            ("Account Created:", user.get("created", "Unknown")[:10]),
-            ("Total Logins:", str(user.get("login_count", 0))),
-            ("Last Login:", user.get("last_login", "N/A")[:19].replace("T", " ") if user.get("last_login") else "First time"),
+            ("Account Created:", user.created[:10]),
+            ("Total Logins:", str(user.login_count)),
+            ("Last Login:", (user.last_login if user.last_login else "N/A")[:19].replace("T", " ") if user.last_login else "First time"),
             ("Current Session:", self.session_start_time.strftime("%Y-%m-%d %H:%M:%S")),
             ("Session IP:", self._get_local_ip())
         ]
@@ -730,7 +855,7 @@ class EnhancedHoneytokenAuthTool:
                  font=("Arial", 16, "bold"), foreground="#f38ba8").pack(pady=20)
         
         # Filter for current user
-        user_history = [entry for entry in self.login_history if entry["username"] == self.current_user]
+        user_history = [entry for entry in self.login_history if entry.username == self.current_user]
         
         text_area = scrolledtext.ScrolledText(history_window, width=90, height=22, 
                                              bg="#313244", fg="#cdd6f4", font=("Courier", 10))
@@ -741,10 +866,10 @@ class EnhancedHoneytokenAuthTool:
             text_area.insert(tk.END, "="*80 + "\n")
             
             for entry in reversed(user_history[-50:]):  # Last 50 entries
-                timestamp = entry["timestamp"][:19].replace("T", " ")
-                success = "✅ Yes" if entry["success"] else "❌ No"
-                ip = entry.get("ip", "Unknown")
-                reason = entry.get("reason", "")
+                timestamp = entry.timestamp[:19].replace("T", " ")
+                success = "✅ Yes" if entry.success else "❌ No"
+                ip = entry.ip
+                reason = entry.reason
                 
                 text_area.insert(tk.END, f"{timestamp:<22} {success:<10} {ip:<18} {reason}\n")
         else:
@@ -780,7 +905,7 @@ class EnhancedHoneytokenAuthTool:
         def do_change():
             user = self.users[self.current_user]
             
-            if not self._verify_password(user["password"], current_pw.get()):
+            if not self._verify_password(user.password, current_pw.get()):
                 messagebox.showerror("Error", "Current password is incorrect")
                 return
             
@@ -846,8 +971,8 @@ class EnhancedHoneytokenAuthTool:
         # Calculate stats
         total_users = len(self.users)
         total_honeytokens = len(self.honeytokens)
-        total_logins = sum(1 for entry in self.login_history if entry["success"])
-        failed_logins = sum(1 for entry in self.login_history if not entry["success"])
+        total_logins = sum(1 for entry in self.login_history if entry.success)
+        failed_logins = sum(1 for entry in self.login_history if not entry.success)
         
         intrusions = 0
         if os.path.exists(self.intrusion_log_file):
@@ -919,11 +1044,11 @@ class EnhancedHoneytokenAuthTool:
                     
                     for entry in self.login_history:
                         writer.writerow([
-                            entry["timestamp"],
-                            entry["username"],
-                            "Yes" if entry["success"] else "No",
-                            entry.get("ip", "Unknown"),
-                            entry.get("reason", "")
+                            entry.timestamp,
+                            entry.username,
+                            "Yes" if entry.success else "No",
+                            entry.ip,
+                            entry.reason
                         ])
             
             elif export_type == "intrusions":
@@ -946,12 +1071,12 @@ class EnhancedHoneytokenAuthTool:
                     writer.writerow([])
                     writer.writerow(["Username", "Created", "Login Count", "Last Login"])
                     
-                    for username, data in self.users.items():
+                    for username, record in self.users.items():
                         writer.writerow([
                             username,
-                            data.get("created", "Unknown")[:10],
-                            data.get("login_count", 0),
-                            data.get("last_login", "Never")[:19] if data.get("last_login") else "Never"
+                            (record.created[:10] if hasattr(record, "created") else "Unknown"),
+                            record.login_count,
+                            record.last_login[:19] if record.last_login else "Never"
                         ])
             
             messagebox.showinfo("Success", f"Report exported successfully to:\n{filename}")
@@ -998,7 +1123,6 @@ class EnhancedHoneytokenAuthTool:
         ttk.Button(settings_frame, text="💾 Save Settings", command=save_settings, 
                   width=20).grid(row=2, column=0, columnspan=2, pady=30)
     
-    # ── SCREEN: HONEYTOKEN MANAGER ───────────────────────────────────────────────
     def _show_honeytoken_manager(self):
         """Display honeytoken management screen"""
         self._clear_frame()
@@ -1064,11 +1188,10 @@ class EnhancedHoneytokenAuthTool:
             messagebox.showerror("Error", "Username already exists")
             return
         
-        self.honeytokens[username] = {
-            "password": self._hash_password(password),
-            "created": datetime.now().isoformat(),
-            "triggered_count": 0
-        }
+        # Create using custom HoneytokenRecord data structure
+        self.honeytokens[username] = HoneytokenRecord(
+            password=self._hash_password(password)
+        )
         
         self._save_honeytokens()
         messagebox.showinfo("Success", 
@@ -1086,9 +1209,9 @@ class EnhancedHoneytokenAuthTool:
         if not self.honeytokens:
             self.honeytoken_listbox.insert(tk.END, "No honeytokens created yet")
         else:
-            for username, data in self.honeytokens.items():
-                created = data["created"][:10]
-                triggered = data.get("triggered_count", 0)
+            for username, record in self.honeytokens.items():
+                created = record.created[:10]
+                triggered = record.triggered_count
                 entry = f"🍯 {username:<20} | Created: {created} | Triggered: {triggered} times"
                 self.honeytoken_listbox.insert(tk.END, entry)
     
