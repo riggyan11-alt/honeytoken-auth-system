@@ -2,7 +2,16 @@
 
 ---
 
-## Version 1.4 — 2026-02-25
+## Version 1.5 — 2026-02-27
+
+### Added
+- UserRecord class — custom data structure replacing plain dict for user storage
+- HoneytokenRecord class — custom data structure with trigger() method for honeytoken traps
+- LoginEntry class — custom data structure for recording each login attempt
+- SystemStats class — custom data structure with record_success(), record_failure(), record_intrusion() methods
+- All four classes include to_dict() and from_dict() methods for encrypted file serialisation
+- Replaced all built-in dictionary usage for structured data with custom class instances
+
 ### Final Submission
 - All screenshots added to screenshots folder
 - Project report PDF added to docs folder
