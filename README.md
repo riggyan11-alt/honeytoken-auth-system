@@ -15,6 +15,7 @@ Built for BSc. Ethical Hacking and Cybersecurity — ST4017CMD.
 - Intrusion logging — every honeytoken trigger logged with timestamp and IP
 - Login history — full audit trail of all login attempts
 - CSV export — export reports for analysis
+- Custom Data Structures — UserRecord, HoneytokenRecord, LoginEntry and SystemStats classes replace built-in dicts
 
 ---
 
