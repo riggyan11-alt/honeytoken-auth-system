@@ -20,7 +20,6 @@ import csv
 
 # ── CUSTOM DATA STRUCTURES ────────────────────────────────────────────────────
 # These custom classes replace plain dictionaries for storing structured data.
-# This satisfies the requirement for user-defined data structures.
 
 class UserRecord:
     """Custom data structure representing a registered user account."""
